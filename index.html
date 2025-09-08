@@ -1,291 +1,230 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>众拼商城移动端整合版</title>
+<title>众拼商城多商品多期版</title>
 <style>
-body{font-family:Arial,sans-serif;margin:0;padding:10px;background:#f5f5f5;}
-.wallet-connect{text-align:center;margin-bottom:15px;}
-.wallet-connected{color:green;font-weight:bold;font-size:16px;word-break:break-all;}
-#balanceDisplay{font-weight:bold;color:blue;margin-top:5px;font-size:16px;}
-.product{background:#fff;padding:15px;margin-bottom:15px;border-radius:10px;position:relative;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-.product h2{margin:0 0 10px 0;font-size:18px;word-break:break-all;}
-.progress{width:100%;background:#eee;height:18px;border-radius:9px;overflow:hidden;margin:8px 0;}
-.progress-bar{height:100%;background:#4caf50;width:0%;transition:width 0.5s;}
-.pay-section{margin-top:10px;display:flex;flex-wrap:wrap;align-items:center;gap:5px;}
-.pay-section input{width:60px;font-size:16px;text-align:center;padding:5px;}
-.pay-section button{padding:8px 12px;font-size:16px;border:none;border-radius:5px;background:#2196F3;color:#fff;cursor:pointer;}
-.pay-section button:disabled{background:#ccc;cursor:not-allowed;}
-.countdown{font-weight:bold;color:red;font-size:16px;margin-top:5px;}
-.celebration-layer{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;}
-.winner-address{font-family:monospace;font-size:20px;font-weight:bold;color:gold;text-align:center;margin-top:10px;}
-.celebration-img{position:absolute;animation:floatUp 4s ease-in-out forwards;}
-@keyframes floatUp{0%{transform:translateY(100px) rotate(0deg);opacity:1;}100%{transform:translateY(-50px) rotate(360deg);opacity:0;}}
-.history-records{background:#f9f9f9;padding:8px;border-radius:6px;margin-top:8px;font-size:14px;overflow-x:auto;}
-.history-records h3{margin-top:0;font-size:16px;}
-table{width:100%;border-collapse: collapse;font-size:14px;}
-th, td{border:1px solid #ccc;padding:4px;text-align:center;word-break:break-all;}
+body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:0;}
+.header{text-align:center;padding:20px;background:#333;color:#fff;font-size:18px;}
+.wallet-btn{display:block;margin:20px auto;padding:10px 20px;font-size:16px;}
+.container{max-width:700px;margin:20px auto;}
+.product-card{background:#fff;padding:15px;margin-bottom:20px;border-radius:8px;box-shadow:0 2px 5px rgba(0,0,0,0.1);}
+.product-title{font-weight:bold;font-size:16px;margin-bottom:5px;}
+.product-info{font-size:14px;margin-bottom:10px;}
+.progress{height:10px;background:#eee;border-radius:5px;overflow:hidden;margin-bottom:10px;}
+.progress-bar{height:100%;width:0%;background:#4caf50;}
+.calc-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.calc-table th,.calc-table td{border:1px solid #ccc;padding:5px;font-size:12px;text-align:center;}
+.calc-result{margin-top:5px;font-size:14px;color:#e91e63;font-weight:bold;}
 .hidden{display:none;}
-#calcDetailModal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;justify-content:center;align-items:center;z-index:1000;}
-#calcDetailModalContent{background:#fff;padding:15px;border-radius:10px;max-height:80%;overflow:auto;width:95%;}
-#scanPaySection{background:#fff;padding:15px;margin-bottom:15px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-#scanPaySection h3{font-size:16px;margin-top:0;}
-#scanPaySection input{width:80px;font-size:16px;padding:5px;text-align:center;}
-#qrCode canvas{width:150px;height:150px;margin-top:10px;}
+.pay-section{margin-bottom:10px;}
+.qr-section{margin-top:10px;text-align:center;}
+.countdown{font-size:14px;color:#ff5722;margin:5px 0;}
+.celebrate{font-size:16px;color:#ff9800;text-align:center;margin:10px 0;}
+input[type=number]{width:60px;padding:3px;}
 </style>
 </head>
 <body>
 
-<div class="wallet-connect" id="walletConnect">
-  <button id="connectWalletBtn">连接钱包</button>
-  <div id="walletAddressDisplay"></div>
-  <div id="balanceDisplay"></div>
-</div>
+<div class="header">众拼商城多商品多期版</div>
+<button class="wallet-btn" id="connectWallet">连接钱包</button>
 
-<div id="scanPaySection" class="hidden">
-  <h3>扫一扫支付 CRC（不参与拼团）</h3>
-  <label>支付金额（CRC，最大50000）: <input type="number" id="scanAmount" value="1" min="1" max="50000"></label>
-  <div id="qrCode"></div>
-  <div id="scanPayStatus"></div>
-</div>
+<div class="container" id="productList">
 
-<div id="productContainer"></div>
-
-<div id="calcDetailModal" class="hidden">
-  <div id="calcDetailModalContent">
-    <h3>计算详情</h3>
-    <div id="calcDetailContent"></div>
-    <button onclick="closeCalcDetail()">关闭</button>
-  </div>
+  <!-- 商品模板 -->
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/web3/dist/web3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <script>
-let walletConnected=false, walletAddress="", userBalance=0;
-const CRC_CONTRACT="0x5b2fe2b06e714b7bea4fd35b428077d850c48087";
-const maxScanAmount=50000;
-const celebrationImages=[
-'https://i.imgur.com/1.png','https://i.imgur.com/2.png','https://i.imgur.com/3.png',
-'https://i.imgur.com/4.png','https://i.imgur.com/5.png','https://i.imgur.com/6.png'
+let isWalletConnected=false;
+let userAddress='';
+const crcContract='0x5b2fe2b06e714b7bea4fd35b428077d850c48087';
+const productList=document.getElementById('productList');
+
+const celebrateImages=[
+  'https://i.imgur.com/1.png',
+  'https://i.imgur.com/2.png',
+  'https://i.imgur.com/3.png',
+  'https://i.imgur.com/4.png',
+  'https://i.imgur.com/5.png',
+  'https://i.imgur.com/6.png',
+  'https://i.imgur.com/7.png',
+  'https://i.imgur.com/8.png',
+  'https://i.imgur.com/9.png',
+  'https://i.imgur.com/10.png'
 ];
 
-async function connectWallet(){
-    if(window.ethereum){
-        try{
-            const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
-            walletAddress=accounts[0]; walletConnected=true;
-            document.getElementById('walletAddressDisplay').innerHTML=`<span class="wallet-connected">已连接钱包：${walletAddress}</span>`;
-            document.getElementById('scanPaySection').classList.remove('hidden');
-            document.querySelectorAll('.pay-section').forEach(ps=>ps.classList.remove('hidden'));
-            document.querySelectorAll('.history-records').forEach(hr=>hr.classList.remove('hidden'));
-            checkBalance(); generateQrCode(); listenScanPayment();
-        }catch(err){ alert("钱包连接失败"); }
-    }else{ alert("请安装支持的加密钱包"); }
-}
-
-async function checkBalance(){
-    if(!walletConnected) return;
-    const web3=new Web3(window.ethereum);
-    const contract=new web3.eth.Contract([{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"}], CRC_CONTRACT);
-    const balance=await contract.methods.balanceOf(walletAddress).call();
-    userBalance=web3.utils.fromWei(balance,"ether");
-    document.getElementById('balanceDisplay').innerText=`CRC余额：${userBalance}`;
-}
-
-function generateQrCode(){
-    const recipient="0xe2ba59c034ce63b3992a9bb2b5577c17e6ec9bad";
-    const amount=parseFloat(document.getElementById('scanAmount').value);
-    if(amount<1||amount>maxScanAmount){ alert("支付金额必须在1~50000 CRC"); return; }
-    const crcUrl=`https://bscscan.com/address/${recipient}?amount=${amount}`;
-    QRCode.toCanvas(document.getElementById('qrCode'), crcUrl, function (error) { if(error) console.error(error); });
-}
-
-async function listenScanPayment(){
-    if(!walletConnected) return;
-    const web3=new Web3(window.ethereum);
-    const recipient="0xe2ba59c034ce63b3992a9bb2b5577c17e6ec9bad";
-    const checkTx=async()=>{
-        try{
-            const contract=new web3.eth.Contract([{"constant":true,"inputs":[{"name":"_owner","type":"address"}],"name":"balanceOf","outputs":[{"name":"balance","type":"uint256"}],"type":"function"}], CRC_CONTRACT);
-            const balance=await contract.methods.balanceOf(walletAddress).call();
-            const newBalance=web3.utils.fromWei(balance,"ether");
-            if(parseFloat(newBalance)<userBalance){
-                document.getElementById('scanPayStatus').innerText="扫码支付成功！";
-                userBalance=newBalance;
-                document.getElementById('balanceDisplay').innerText=`CRC余额：${userBalance}`;
-                clearInterval(intervalId); generateQrCode();
-            }
-        }catch(err){ console.error(err); }
-    }
-    const intervalId=setInterval(checkTx,3000);
-}
-
-document.getElementById('scanAmount').addEventListener('input', generateQrCode);
-document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
-
-// ----------------- 商品数据 -----------------
-let products=[
-  {id:'p1', name:'iPhone 15 Pro Max', code:'10001', stock:5, totalTimes:100, perToken:2, remainTimes:100, period:1, records:[], historyForCalc:[]},
-  {id:'p2', name:'iPad 12', code:'10002', stock:3, totalTimes:50, perToken:3, remainTimes:50, period:1, records:[], historyForCalc:[]}
+// 多商品配置，可扩展
+const products=[
+  {id:'10001',name:'商品A',unit:5,total:10,stock:5,maxPerPay:50000},
+  {id:'10002',name:'商品B',unit:10,total:20,stock:8,maxPerPay:50000}
 ];
 
-function renderProducts(){
-  const container=document.getElementById('productContainer');
-  container.innerHTML='';
-  products.forEach(product=>{
-    const div=document.createElement('div'); div.className='product'; div.id=product.id;
-    div.innerHTML=`
-      <h2>${product.name}（编码:${product.code}）</h2>
-      <div>库存: <span class="stockDisplay">${product.stock}</span></div>
-      <div>总需人次: ${product.totalTimes}</div>
-      <div>每人次需要CRC: ${product.perToken}</div>
-      <div class="progress"><div class="progress-bar" style="width:0%"></div></div>
-      <div class="pay-section hidden">
-        <button onclick="adjustTimes('${product.id}',-1)">-</button>
-        <input type="number" id="times_${product.id}" value="1" min="1" max="10">
-        <button onclick="adjustTimes('${product.id}',1)">+</button>
-        <button onclick="pay('${product.id}')">支付参与</button>
+// 渲染商品
+products.forEach(prod=>{
+  const card=document.createElement('div');
+  card.className='product-card';
+  card.dataset.productId=prod.id;
+  card.dataset.unit=prod.unit;
+  card.dataset.total=prod.total;
+  card.dataset.stock=prod.stock;
+  card.dataset.maxperpay=prod.maxPerPay;
+  card.innerHTML=`
+    <div class="product-title">${prod.name}（商品编码:${prod.id}）</div>
+    <div class="product-info">
+      库存: <span class="stock">${prod.stock}</span> &nbsp;|&nbsp;
+      总需人次: <span class="total">${prod.total}</span> &nbsp;|&nbsp;
+      已参与: <span class="participated">0</span> &nbsp;|&nbsp;
+      每人次 CRC: <span class="unit">${prod.unit}</span>
+    </div>
+    <div class="progress"><div class="progress-bar"></div></div>
+
+    <div class="pay-section">
+      人次: <input type="number" class="buy-times" value="1" min="1" max="${prod.maxPerPay}">
+      <button class="pay-btn">拼团支付</button>
+    </div>
+
+    <div class="countdown hidden">计算中: 30 秒</div>
+    <div class="celebrate hidden">
+      <img src="" class="celebrate-img" width="100"><br>
+      🎉 中奖地址: <span class="winning-address">-</span> 🎉
+    </div>
+
+    <div class="calc-section hidden">
+      <table class="calc-table">
+        <thead>
+          <tr><th>云付时间</th><th>转换数据</th><th>钱包地址</th></tr>
+        </thead>
+        <tbody class="record-list"></tbody>
+      </table>
+      <div class="calc-result">
+        中奖码: <span class="winning-code">-</span>
       </div>
-      <div class="countdown hidden"></div>
-      <div class="celebration-layer"></div>
-      <div class="history-records hidden">
-        <h3>历史记录</h3>
-        <table class="historyTable"><tr><th>期数</th><th>钱包地址</th><th>图片</th><th>时间</th><th>计算详情</th></tr></table>
-      </div>`;
-    container.appendChild(div);
-    updateProductUI(product, div);
-  });
-}
+    </div>
 
-function updateProductUI(product, div){
-    const progressDiv=div.querySelector('.progress-bar');
-    const percent=((product.totalTimes-product.remainTimes)/product.totalTimes)*100;
-    progressDiv.style.width=`${percent}%`;
-    const stockSpan=div.querySelector('.stockDisplay');
-    stockSpan.innerText=product.stock;
-    stockSpan.style.color=product.stock===0?'gray':(product.stock<10?'red':'black');
-}
+    <div class="qr-section hidden">
+      <p>扫码支付 CRC（非拼团，每次≤50000 CRC）:</p>
+      <input type="number" class="qr-amount" placeholder="支付数量" min="1" max="50000">
+      <button class="qr-pay-btn">扫码支付</button>
+      <img class="qr-code" src="" alt="二维码" width="150">
+    </div>
+  `;
+  productList.appendChild(card);
+});
 
-function adjustTimes(id,delta){
-    const input=document.getElementById('times_'+id);
-    let val=parseInt(input.value)+delta;
-    if(val<1) val=1; if(val>10) val=10;
-    input.value=val;
-}
+document.getElementById('connectWallet').onclick=async()=>{
+  if(window.ethereum){
+    try{
+      const accounts=await window.ethereum.request({method:'eth_requestAccounts'});
+      userAddress=accounts[0];
+      isWalletConnected=true;
+      alert('钱包已连接: '+userAddress);
+      document.querySelectorAll('.calc-section').forEach(sec=>sec.classList.remove('hidden'));
+      document.querySelectorAll('.qr-section').forEach(sec=>sec.classList.remove('hidden'));
+    }catch(err){alert('连接失败');}
+  }else{alert('请安装支持钱包的浏览器');}
+};
 
-function pay(id){
-    if(!walletConnected){ alert("请先连接钱包"); return; }
-    const product=products.find(p=>p.id===id);
-    const div=document.getElementById(id);
-    const times=parseInt(document.getElementById('times_'+id).value);
-    const totalAmount=times*product.perToken;
-    if(parseFloat(userBalance)<totalAmount){ alert("余额不足"); return; }
-    userBalance-=totalAmount; document.getElementById('balanceDisplay').innerText=`CRC余额：${userBalance.toFixed(2)}`;
-    for(let i=0;i<times;i++){
-        product.records.push({address:walletAddress,timestamp:new Date().getTime()});
-        product.remainTimes-=1;
+productList.querySelectorAll('.product-card').forEach(card=>{
+  const payBtn=card.querySelector('.pay-btn');
+  const progressBar=card.querySelector('.progress-bar');
+  const participatedElem=card.querySelector('.participated');
+  const total=parseInt(card.dataset.total);
+  const recordList=card.querySelector('.record-list');
+  const winningCodeElem=card.querySelector('.winning-code');
+  const winningAddressElem=card.querySelector('.winning-address');
+  const countdownElem=card.querySelector('.countdown');
+  const celebrateElem=card.querySelector('.celebrate');
+  const celebrateImg=card.querySelector('.celebrate-img');
+  const unit=parseInt(card.dataset.unit);
+  const stockElem=card.querySelector('.stock');
+  const buyInput=card.querySelector('.buy-times');
+  const maxPerPay=parseInt(card.dataset.maxperpay);
+
+  const qrBtn=card.querySelector('.qr-pay-btn');
+  const qrInput=card.querySelector('.qr-amount');
+  const qrImg=card.querySelector('.qr-code');
+
+  let records=[];
+
+  // 拼团支付
+  payBtn.onclick=async()=>{
+    if(!isWalletConnected){alert('请先连接钱包');return;}
+    let buyTimes=parseInt(buyInput.value);
+    if(buyTimes<1 || buyTimes>maxPerPay){alert('每次购买人次限制 1-'+maxPerPay);return;}
+    if(parseInt(stockElem.innerText)<buyTimes){alert('库存不足');return;}
+
+    try{
+      const web3=new Web3(window.ethereum);
+      const amount=web3.utils.toWei((unit*buyTimes).toString(),'ether');
+      await web3.eth.sendTransaction({from:userAddress,to:crcContract,value:amount});
+    }catch(err){alert('支付失败或取消');return;}
+
+    for(let i=0;i<buyTimes;i++){
+      let payTime=new Date();
+      let timeStr=payTime.toISOString().replace('T',' ').replace('Z','');
+      let convertVal=parseInt(payTime.getHours().toString().padStart(2,'0')+
+                                payTime.getMinutes().toString().padStart(2,'0')+
+                                payTime.getSeconds().toString().padStart(2,'0')+
+                                payTime.getMilliseconds().toString().padStart(3,'0'));
+      records.push({time:timeStr,value:convertVal,address:userAddress});
+
+      let tr=document.createElement('tr');
+      tr.innerHTML=`<td>${timeStr}</td><td>${convertVal}</td><td>${userAddress}</td>`;
+      recordList.appendChild(tr);
+
+      let participated=parseInt(participatedElem.innerText)+1;
+      participatedElem.innerText=participated;
+      progressBar.style.width=(participated/total*100)+'%';
+      stockElem.innerText=Math.max(0,parseInt(stockElem.innerText)-1);
+
+      if(participated>=total){
+        countdownElem.classList.remove('hidden');
+        let countdown=30;
+        const timer=setInterval(()=>{
+          countdownElem.innerText='计算中: '+countdown+' 秒';
+          countdown--;
+          if(countdown<0){
+            clearInterval(timer);
+            countdownElem.classList.add('hidden');
+            let sum=records.slice(-100).reduce((a,b)=>a+b.value,0);
+            let winningCode=(sum%total)+10000001;
+            winningCodeElem.innerText=winningCode;
+            winningAddressElem.innerText=records[records.length-1].address;
+
+            celebrateImg.src=celebrateImages[Math.floor(Math.random()*celebrateImages.length)];
+            celebrateElem.classList.remove('hidden');
+            setTimeout(()=>{celebrateElem.classList.add('hidden');},8000);
+
+            // 下一期可重置库存和人次
+            participatedElem.innerText=0;
+            stockElem.innerText=card.dataset.stock;
+            progressBar.style.width='0%';
+          }
+        },1000);
+        break;
+      }
     }
-    updateProductUI(product, div);
-    if(product.remainTimes===0){ startCountdown(product, div); }
-}
+  };
 
-// ----------------- 倒计时和中奖 -----------------
-function startCountdown(product, div){
-    const countdownDiv = div.querySelector('.countdown');
-    countdownDiv.classList.remove('hidden');
-    let sec=30;
-    countdownDiv.innerText=`计算中 ${sec}s`;
-    const timer = setInterval(()=>{
-        sec--;
-        countdownDiv.innerText=`计算中 ${sec}s`;
-        if(sec<=0){ clearInterval(timer); countdownDiv.classList.add('hidden'); calculateWinner(product, div);}
-    },1000);
-}
+  // 扫码支付（非拼团）
+  qrBtn.onclick=async()=>{
+    if(!isWalletConnected){alert('请先连接钱包');return;}
+    let amount=parseInt(qrInput.value);
+    if(!amount || amount<1 || amount>50000){alert('扫码支付数量必须在1-50000 CRC'); return;}
+    try{
+      const web3=new Web3(window.ethereum);
+      const weiAmount=web3.utils.toWei(amount.toString(),'ether');
+      await web3.eth.sendTransaction({from:userAddress,to:crcContract,value:weiAmount});
+      alert('扫码支付成功: '+amount+' CRC');
+    }catch(err){alert('支付失败或取消'); return;}
+  };
 
-// ----------------- 中奖动画 -----------------
-function showWinnerAnimation(product, div, winnerAddress){
-    const layer = div.querySelector('.celebration-layer');
-    layer.innerHTML='';
-    layer.classList.remove('hidden');
-    const addrDiv = document.createElement('div');
-    addrDiv.className='winner-address';
-    addrDiv.innerText=winnerAddress;
-    layer.appendChild(addrDiv);
-    const numImages=Math.floor(Math.random()*6)+5;
-    for(let i=0;i<numImages;i++){
-        const img=document.createElement('img');
-        const index=Math.floor(Math.random()*celebrationImages.length);
-        img.src=celebrationImages[index];
-        img.className='celebration-img';
-        img.style.left=Math.random()*80+"%";
-        img.style.top=Math.random()*60+"%";
-        img.style.width=30+Math.random()*40+"px";
-        img.style.height=img.style.width;
-        layer.appendChild(img);
-    }
-    setTimeout(()=>{ layer.classList.add('hidden'); },8000);
-}
-
-// ----------------- 历史记录 -----------------
-function addHistoryRecord(product, winnerAddress){
-    const div = document.getElementById(product.id);
-    const historyTable = div.querySelector('.historyTable');
-    const tr=document.createElement('tr');
-    const imgIndex = Math.floor(Math.random()*celebrationImages.length);
-    tr.innerHTML=`<td>${product.period}</td><td>${winnerAddress}</td><td><img src="${celebrationImages[imgIndex]}" class="celebration-img"></td><td>${new Date().toLocaleString()}</td><td><button onclick="showCalcDetail(${product.period})">计算详情</button></td>`;
-    historyTable.appendChild(tr);
-}
-
-function calculateWinner(product, div){
-    if(!product.historyForCalc) product.historyForCalc=[];
-    product.historyForCalc.push([...product.records]); 
-    const records = product.records.slice(-100);
-    let sum=0;
-    records.forEach(r=>{
-        const date=new Date(r.timestamp);
-        const val=date.getHours()*10000000+date.getMinutes()*100000+date.getSeconds()*1000+date.getMilliseconds();
-        sum+=val;
-    });
-    const winnerIndex=sum % product.totalTimes;
-    const winnerRecord = product.records[winnerIndex];
-    const winnerAddress = winnerRecord.address;
-    showWinnerAnimation(product, div, winnerAddress);
-    addHistoryRecord(product, winnerAddress);
-    product.stock=Math.max(0,product.stock-1);
-    product.period+=1;
-    product.remainTimes=product.totalTimes;
-    product.records=[];
-    updateProductUI(product, div);
-}
-
-// ----------------- 计算详情弹窗 -----------------
-function showCalcDetail(period){
-    let content='';
-    products.forEach(p=>{
-        if(p.period-1===period-1){
-            const records=p.historyForCalc[period-1] || [];
-            let sum=0;
-            let tableRows='';
-            records.forEach((r,i)=>{
-                const date=new Date(r.timestamp);
-                const val=date.getHours()*10000000+date.getMinutes()*100000+date.getSeconds()*1000+date.getMilliseconds();
-                sum+=val;
-                tableRows+=`<tr><td>${date.toLocaleString()}</td><td>${val}</td><td>${r.address}</td></tr>`;
-            });
-            const winnerCode=(sum % p.totalTimes) + 10000001;
-            content+=`<h4>商品:${p.name} 期数:${period}</h4>`;
-            content+=`<p>中奖码计算: (时间取值之和: ${sum}) ÷ 总需人次: ${p.totalTimes} 余数 + 10000001 = ${winnerCode}</p>`;
-            content+=`<table border="1" style="width:100%;border-collapse:collapse;text-align:center;"><tr><th>云付时间</th><th>转换数据</th><th>钱包地址</th></tr>${tableRows}</table>`;
-        }
-    });
-    document.getElementById('calcDetailContent').innerHTML=content;
-    document.getElementById('calcDetailModal').classList.remove('hidden');
-}
-function closeCalcDetail(){ document.getElementById('calcDetailModal').classList.add('hidden'); }
-
-renderProducts();
+  QRCode.toDataURL(crcContract,{width:150}).then(url=>{qrImg.src=url;});
+});
 </script>
+
 </body>
 </html>
